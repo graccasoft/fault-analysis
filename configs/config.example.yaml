@@ -1,0 +1,27 @@
+schema: instruction
+paths:
+  train_path: data/samples/sample.jsonl
+  val_path: null
+  output_dir: outputs/flan_t5_lora
+lora:
+  r: 8
+  alpha: 16
+  dropout: 0.1
+  target_modules: null
+train:
+  model_name: google/flan-t5-base
+  max_source_length: 512
+  max_target_length: 256
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  learning_rate: 0.0002
+  num_train_epochs: 1
+  weight_decay: 0.0
+  warmup_ratio: 0.03
+  logging_steps: 10
+  eval_steps: 200
+  save_steps: 200
+  gradient_accumulation_steps: 1
+  fp16: false
+  bf16: false
+  seed: 42
