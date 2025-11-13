@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  fault-analysis:
+    build: .
+    container_name: fault-analysis-app
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./app:/app/app
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./configs:/app/configs
+    environment:
+      - PYTHONUNBUFFERED=1
+    command: streamlit run app/streamlit_app.py --server.address 0.0.0.0
+
+  # Service for training (run separately)
+  trainer:
+    build: .
+    container_name: fault-analysis-trainer
+    volumes:
+      - ./src:/app/src  
+      - ./data:/app/data
+      - ./outputs:/app/outputs
+      - ./configs:/app/configs
+    environment:
+      - PYTHONUNBUFFERED=1
+    profiles:
+      - training
+    command: python scripts/train_lora.py --config configs/config.example.yaml

@@ -73,7 +73,17 @@ def train(config_path: str) -> None:
     ds = _build_datasets(cfg)
 
     def preprocess(batch):
-        formatted = [_format_examples(ex, cfg.schema) for ex in batch]
+        # batch is a dict of lists, need to convert to list of dicts
+        # Get the first key to determine batch size
+        first_key = list(batch.keys())[0]
+        batch_size = len(batch[first_key])
+        
+        # Convert columnar format to row format
+        examples = [
+            {key: batch[key][i] for key in batch.keys()}
+            for i in range(batch_size)
+        ]
+        formatted = [_format_examples(ex, cfg.schema) for ex in examples]
         model_inputs = tok(
             [f["source"] for f in formatted],
             max_length=cfg.train.max_source_length,
@@ -102,7 +112,7 @@ def train(config_path: str) -> None:
         weight_decay=cfg.train.weight_decay,
         warmup_ratio=cfg.train.warmup_ratio,
         logging_steps=cfg.train.logging_steps,
-        evaluation_strategy="steps" if "validation" in ds else "no",
+        eval_strategy="steps" if "validation" in ds else "no",
         eval_steps=cfg.train.eval_steps,
         save_steps=cfg.train.save_steps,
         gradient_accumulation_steps=cfg.train.gradient_accumulation_steps,

@@ -1,6 +1,6 @@
 schema: instruction
 paths:
-  train_path: data/samples/sample.jsonl
+  train_path: data/samples/fault_data_instruction_with_ids.jsonl
   val_path: null
   output_dir: outputs/flan_t5_lora
 lora:
@@ -9,7 +9,7 @@ lora:
   dropout: 0.1
   target_modules: null
 train:
-  model_name: google/flan-t5-base
+  model_name: google/flan-t5-small
   max_source_length: 512
   max_target_length: 256
   per_device_train_batch_size: 2
