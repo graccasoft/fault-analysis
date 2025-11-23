@@ -47,11 +47,12 @@ with tab1:
         @st.cache_resource
         def load_model(model_path):
             try:
-                from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+                from transformers import AutoTokenizer
+                from peft import AutoPeftModelForSeq2SeqLM
                 
-                # Load base model and tokenizer
+                # Load LoRA fine-tuned model with adapters
                 tokenizer = AutoTokenizer.from_pretrained(model_path)
-                model = AutoModelForSeq2SeqLM.from_pretrained(model_path)
+                model = AutoPeftModelForSeq2SeqLM.from_pretrained(model_path)
                 
                 return model, tokenizer
             except Exception as e:
@@ -71,14 +72,14 @@ with tab1:
             with col1:
                 instruction = st.text_input(
                     "Instruction",
-                    value="Classify the likely fault and suggest an action.",
+                    value="Analyze the power system event and generate a full technical assessment.",
                     help="The task instruction for the model"
                 )
             
             fault_input = st.text_area(
                 "Fault Description",
                 height=150,
-                placeholder="Example: Feeder A experienced intermittent undervoltage alarms. Field team reported vegetation near line in wet conditions.",
+                placeholder="Example: Transformer T3 oil temperature reached 94°C. Cooling fans did not activate. Load is at 82%. No protection trip.",
                 help="Describe the fault or incident"
             )
             
@@ -109,7 +110,10 @@ with tab1:
                                 temperature=temperature,
                                 do_sample=True,
                                 top_p=0.95,
-                                num_return_sequences=1
+                                num_return_sequences=1,
+                                repetition_penalty=1.2,
+                                length_penalty=1.0,
+                                early_stopping=True
                             )
                             
                             # Decode
@@ -138,9 +142,9 @@ with tab1:
             # Example prompts
             with st.expander("📝 Example Prompts"):
                 examples = [
-                    "Feeder A experienced intermittent undervoltage alarms. Field team reported vegetation near line in wet conditions.",
-                    "Transformer T3 oil temp reached 95C during evening peak. Cooling fan 2 reported failure.",
-                    "Circuit breaker CB-12 tripped three times in 24 hours. No visible damage observed."
+                    "Transformer T3 oil temperature reached 94°C. Cooling fans did not activate. Load is at 82%. No protection trip.",
+                    "Feeder F23 voltage dropped on Phase B. Relay OCR-B tripped instantly. High ground current recorded for 1.2 seconds.",
+                    "Inverter at Station S14 shows DC link voltage oscillation between 720–860 V. Reactive power fluctuating. Intermittent derating."
                 ]
                 for i, ex in enumerate(examples, 1):
                     st.markdown(f"**Example {i}:** {ex}")
