@@ -79,7 +79,7 @@ with tab1:
             fault_input = st.text_area(
                 "Fault Description",
                 height=150,
-                placeholder="Example: Transformer T3 oil temperature reached 94°C. Cooling fans did not activate. Load is at 82%. No protection trip.",
+                placeholder="Example: Transformer T3 oil temperature reached 92°C. One cooling fan failed to start. Load at 78%. Slight humming noise noted. No protective trip.",
                 help="Describe the fault or incident"
             )
             
@@ -142,9 +142,9 @@ with tab1:
             # Example prompts
             with st.expander("📝 Example Prompts"):
                 examples = [
-                    "Transformer T3 oil temperature reached 94°C. Cooling fans did not activate. Load is at 82%. No protection trip.",
-                    "Feeder F23 voltage dropped on Phase B. Relay OCR-B tripped instantly. High ground current recorded for 1.2 seconds.",
-                    "Inverter at Station S14 shows DC link voltage oscillation between 720–860 V. Reactive power fluctuating. Intermittent derating."
+                    "Transformer T3 oil temperature reached 92°C. One cooling fan failed to start. Load at 78%. Slight humming noise noted. No protective trip.",
+                    "TX-4 winding temperature exceeded 105°C. Cooling system active but ineffective. Load is 95% of rated capacity. Oil leakage observed.",
+                    "Capacitor bank CB-2 reported unbalanced currents. One capacitor unit failed open. Excessive harmonic distortion detected in the feeder."
                 ]
                 for i, ex in enumerate(examples, 1):
                     st.markdown(f"**Example {i}:** {ex}")
