@@ -5,6 +5,10 @@ from collections import Counter
 import os
 from pathlib import Path
 import sys
+from datetime import datetime
+import time
+import plotly.express as px
+import plotly.graph_objects as go
 
 # Add src to path for imports
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,8 +35,43 @@ with st.sidebar:
     else:
         st.warning("⚠ Model not found. Train a model first.")
 
+# Initialize query log file
+QUERY_LOG_FILE = ROOT / "outputs" / "query_log.jsonl"
+QUERY_LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
+
+def log_query(input_text, output_text, inference_time, instruction):
+    """Log query to JSONL file"""
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "input": input_text,
+        "output": output_text,
+        "instruction": instruction,
+        "input_length": len(input_text),
+        "output_length": len(output_text),
+        "inference_time": inference_time
+    }
+    with open(QUERY_LOG_FILE, "a") as f:
+        f.write(json.dumps(log_entry) + "\n")
+
+def load_query_logs():
+    """Load query logs from JSONL file"""
+    if not QUERY_LOG_FILE.exists():
+        return pd.DataFrame()
+    
+    logs = []
+    with open(QUERY_LOG_FILE, "r") as f:
+        for line in f:
+            if line.strip():
+                logs.append(json.loads(line))
+    
+    if logs:
+        df = pd.DataFrame(logs)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        return df
+    return pd.DataFrame()
+
 # Create tabs
-tab1, tab2 = st.tabs(["🔍 Inference", "📊 Data Explorer"])
+tab1, tab2, tab3 = st.tabs(["🔍 Inference", "📊 Data Explorer", "📈 Statistics"])
 
 # Tab 1: Inference
 with tab1:
@@ -103,7 +142,8 @@ with tab1:
                                 truncation=True
                             )
                             
-                            # Generate
+                            # Generate with timing
+                            start_time = time.time()
                             outputs = model.generate(
                                 **inputs,
                                 max_length=max_length,
@@ -115,13 +155,18 @@ with tab1:
                                 length_penalty=1.0,
                                 early_stopping=True
                             )
+                            inference_time = time.time() - start_time
                             
                             # Decode
                             result = tokenizer.decode(outputs[0], skip_special_tokens=True)
                             
+                            # Log the query
+                            log_query(fault_input, result, inference_time, instruction)
+                            
                             # Display result
                             st.subheader("Analysis Result")
                             st.success(result)
+                            st.caption(f"⏱️ Inference time: {inference_time:.2f}s")
                             
                             # Show formatted output
                             with st.expander("View Details"):
@@ -179,3 +224,102 @@ with tab2:
     
     st.divider()
     st.info("💡 Train a LoRA model with: `docker-compose --profile training run --rm trainer`")
+
+# Tab 3: Statistics
+with tab3:
+    st.header("Query Statistics")
+    
+    df_logs = load_query_logs()
+    
+    if df_logs.empty:
+        st.info("📊 No queries logged yet. Start analyzing faults to see statistics here!")
+    else:
+        # Summary metrics
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Total Queries", len(df_logs))
+        with col2:
+            st.metric("Avg Inference Time", f"{df_logs['inference_time'].mean():.2f}s")
+        with col3:
+            st.metric("Avg Input Length", f"{df_logs['input_length'].mean():.0f} chars")
+        with col4:
+            st.metric("Avg Output Length", f"{df_logs['output_length'].mean():.0f} chars")
+        
+        st.divider()
+        
+        # Visualizations
+        col_left, col_right = st.columns(2)
+        
+        with col_left:
+            # Queries over time
+            st.subheader("📅 Queries Over Time")
+            df_logs['date'] = df_logs['timestamp'].dt.date
+            queries_per_day = df_logs.groupby('date').size().reset_index(name='count')
+            fig_timeline = px.line(
+                queries_per_day, 
+                x='date', 
+                y='count',
+                labels={'date': 'Date', 'count': 'Number of Queries'},
+                markers=True
+            )
+            fig_timeline.update_layout(height=300)
+            st.plotly_chart(fig_timeline, use_container_width=True)
+            
+            # Inference time distribution
+            st.subheader("⏱️ Inference Time Distribution")
+            fig_time = px.histogram(
+                df_logs, 
+                x='inference_time',
+                nbins=20,
+                labels={'inference_time': 'Inference Time (seconds)'},
+            )
+            fig_time.update_layout(height=300, showlegend=False)
+            st.plotly_chart(fig_time, use_container_width=True)
+        
+        with col_right:
+            # Input vs Output length scatter
+            st.subheader("📏 Input vs Output Length")
+            fig_scatter = px.scatter(
+                df_logs,
+                x='input_length',
+                y='output_length',
+                color='inference_time',
+                labels={
+                    'input_length': 'Input Length (chars)',
+                    'output_length': 'Output Length (chars)',
+                    'inference_time': 'Time (s)'
+                },
+                color_continuous_scale='Viridis'
+            )
+            fig_scatter.update_layout(height=300)
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            # Recent queries table
+            st.subheader("🕐 Recent Queries")
+            recent_df = df_logs.sort_values('timestamp', ascending=False).head(5)[[
+                'timestamp', 'input_length', 'output_length', 'inference_time'
+            ]].copy()
+            recent_df['timestamp'] = recent_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            recent_df.columns = ['Time', 'Input Len', 'Output Len', 'Inference (s)']
+            st.dataframe(recent_df, use_container_width=True, hide_index=True)
+        
+        st.divider()
+        
+        # Detailed query log
+        with st.expander("🔍 View All Query Details"):
+            display_df = df_logs.sort_values('timestamp', ascending=False)[[
+                'timestamp', 'input', 'output', 'inference_time'
+            ]].copy()
+            display_df['timestamp'] = display_df['timestamp'].dt.strftime('%Y-%m-%d %H:%M:%S')
+            display_df.columns = ['Timestamp', 'Input', 'Output', 'Inference Time (s)']
+            st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        # Download logs
+        if st.button("📥 Download Query Logs (CSV)"):
+            csv = df_logs.to_csv(index=False)
+            st.download_button(
+                label="Download CSV",
+                data=csv,
+                file_name=f"query_logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv"
+            )
